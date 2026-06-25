@@ -1,0 +1,117 @@
+{
+  "player_name": "kiril",
+  "ui_language": "ru",
+  "scene": "base",
+  "coins": 163627.59318502527,
+  "clicks": 118,
+  "health": 1761,
+  "max_health": 1910,
+  "x": 882.8000000000029,
+  "y": 206.40000000000026,
+  "speed": 5.2,
+  "rebirths": 0,
+  "permanent_multiplier": 1.0,
+  "total_earned": 5018.473185005185,
+  "db_synced_total": 0.0,
+  "freelance_last_payout": 1782375218.5172746,
+  "base_chest_last": 1782375278.8902903,
+  "owned_languages": [
+    {
+      "id": "scratch",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "python",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "java",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "cpp",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "javascript",
+      "owned": false,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "csharp",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "go",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "rust",
+      "owned": true,
+      "income_multiplier": 1.0
+    },
+    {
+      "id": "kotlin",
+      "owned": false,
+      "income_multiplier": 1.0
+    }
+  ],
+  "owned_upgrades": [
+    {
+      "name": "Power mouse",
+      "bought": true,
+      "purchased_for": []
+    },
+    {
+      "name": "Mechanic keyboard",
+      "bought": true,
+      "purchased_for": []
+    },
+    {
+      "name": "Armor vest",
+      "bought": true,
+      "purchased_for": []
+    },
+    {
+      "name": "Stamina sneakers",
+      "bought": true,
+      "purchased_for": []
+    },
+    {
+      "name": "Heavy armor",
+      "bought": true,
+      "purchased_for": []
+    },
+    {
+      "name": "Turbo mouse",
+      "bought": true,
+      "purchased_for": []
+    },
+    {
+      "name": "Freelance contract",
+      "bought": false,
+      "purchased_for": []
+    },
+    {
+      "name": "Python focus",
+      "bought": false,
+      "purchased_for": []
+    },
+    {
+      "name": "Java focus",
+      "bought": false,
+      "purchased_for": []
+    },
+    {
+      "name": "C++ focus",
+      "bought": false,
+      "purchased_for": []
+    }
+  ]
+}
