@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import tkinter as tk
 from traceback import print_exception
 import customtkinter as ctk
@@ -17,7 +18,7 @@ class GameApp(ctk.CTk):
         init_db()
         self.game_state = game_state
         load_game(self.game_state)
-        if player_name:
+        if player_name is not None:
             self.game_state.set_player_name(player_name)
 
         self.title(self.game_state.t("title"))
@@ -29,6 +30,8 @@ class GameApp(ctk.CTk):
         self._keys_down = set()
         self._scene_built_for = None
         self._last_top_refresh = 0.0
+        self._last_ui_refresh = 0.0
+        self._ui_refresh_interval = 0.15
         self._build_layout()
 
         self.bind_all("<KeyPress>", self._on_key_press)
@@ -109,7 +112,7 @@ class GameApp(ctk.CTk):
 
         self._build_tabs()
         self._build_scene()
-        self._update_ui()
+        self._update_ui(force=True)
 
     def _build_tabs(self):
         self.languages_frame = ctk.CTkScrollableFrame(self.tabview.tab("Lang"))
@@ -258,7 +261,7 @@ class GameApp(ctk.CTk):
         self.title(self.game_state.t("title"))
         self._scene_built_for = None
         self._build_scene()
-        self._update_ui()
+        self._update_ui(force=True)
 
     def _show_window(self):
         self.deiconify()
@@ -273,14 +276,20 @@ class GameApp(ctk.CTk):
             self.game_state.sync_quests()
         else:
             self.game_state.message = self.game_state.t("too_fast")
+        self._update_ui(force=True)
 
     def _rebirth(self):
         if self.game_state.rebirth():
             self._scene_built_for = None
             self._build_scene()
-        self._update_ui()
+        self._update_ui(force=True)
 
-    def _update_ui(self):
+    def _update_ui(self, force: bool = False):
+        now = time.monotonic()
+        if not force and now - self._last_ui_refresh < self._ui_refresh_interval:
+            return
+        self._last_ui_refresh = now
+
         self.title_label.configure(text=self.game_state.t("title"))
         self.language_toggle_button.configure(text=self.game_state.t("toggle_language"))
         self.program_button.configure(text=self.game_state.t("program"))
@@ -322,13 +331,18 @@ class GameApp(ctk.CTk):
             )
         )
 
-        import time as _time
-        if _time.time() - self._last_top_refresh > 2:
-            self._last_top_refresh = _time.time()
+        if time.time() - self._last_top_refresh > 2:
+            self._last_top_refresh = time.time()
             self.game_state.refresh_top_players()
             db_top = [item for item in top_users(3) if item["name"] != self.game_state.player_name]
-            combined = db_top + [item for item in self.game_state.top_players if item["name"] != self.game_state.player_name]
-            combined.append({"name": self.game_state.player_name, "coins": int(self.game_state.player.coins), "rebirths": self.game_state.rebirths})
+            combined = []
+            seen_names = set()
+            for item in db_top + self.game_state.top_players + [{"name": self.game_state.player_name, "coins": int(self.game_state.player.coins), "rebirths": self.game_state.rebirths}]:
+                name = item["name"]
+                if name in seen_names:
+                    continue
+                seen_names.add(name)
+                combined.append(item)
             combined.sort(key=lambda item: (item.get("rebirths", 0), item["coins"]), reverse=True)
             self._cached_top = combined
         combined = getattr(self, "_cached_top", self.game_state.top_players)
@@ -357,24 +371,7 @@ class GameApp(ctk.CTk):
                 row["label"].configure(
                     text=f"{upgrade.name} - {price} {self.game_state.t('coins')}\n{self.game_state.t('language_upgrade_tip')}"
                 )
-                for child in row["frame"].winfo_children()[1:]:
-                    child.destroy()
-                if self.game_state.scene == "base":
-                    for language in self.game_state.languages:
-                        if not language.owned:
-                            continue
-                        button = ctk.CTkButton(
-                            row["frame"],
-                            text=self.game_state.t("buy_for", name=language.name),
-                            width=120,
-                            command=lambda u=upgrade, lang_id=language.id: self._buy_upgrade_for(u, lang_id),
-                        )
-                        button.pack(side="right", padx=4, pady=8)
-                        if language.id in upgrade.purchased_for:
-                            button.configure(state="disabled", text=self.game_state.t("owned"))
-                else:
-                    placeholder = ctk.CTkLabel(row["frame"], text=self.game_state.t("shop_only"))
-                    placeholder.pack(side="right", padx=4, pady=8)
+                self._update_language_upgrade_controls(row, upgrade)
             else:
                 row["label"].configure(
                     text=f"{upgrade.name} - {price} {self.game_state.t('coins')}\n"
@@ -412,17 +409,61 @@ class GameApp(ctk.CTk):
             else:
                 row["button"].configure(text=self.game_state.t("owned"), state="disabled")
 
+    def _update_language_upgrade_controls(self, row, upgrade):
+        owned_language_ids = tuple(language.id for language in self.game_state.languages if language.owned)
+        signature = (
+            self.game_state.scene,
+            self.game_state.ui_language,
+            owned_language_ids,
+            tuple(sorted(upgrade.purchased_for)),
+        )
+        if row.get("control_signature") != signature:
+            for child in row["frame"].winfo_children()[1:]:
+                child.destroy()
+
+            controls = []
+            if self.game_state.scene == "base":
+                for language in self.game_state.languages:
+                    if not language.owned:
+                        continue
+                    button = ctk.CTkButton(
+                        row["frame"],
+                        text=self.game_state.t("buy_for", name=language.name),
+                        width=120,
+                        command=lambda u=upgrade, lang_id=language.id: self._buy_upgrade_for(u, lang_id),
+                    )
+                    button.pack(side="right", padx=4, pady=8)
+                    controls.append((language.id, language.name, button))
+            else:
+                placeholder = ctk.CTkLabel(row["frame"], text=self.game_state.t("shop_only"))
+                placeholder.pack(side="right", padx=4, pady=8)
+                controls.append((None, None, placeholder))
+
+            row["controls"] = controls
+            row["control_signature"] = signature
+
+        for language_id, language_name, control in row.get("controls", []):
+            if language_id is None:
+                control.configure(text=self.game_state.t("shop_only"))
+                continue
+            if language_id in upgrade.purchased_for:
+                control.configure(state="disabled", text=self.game_state.t("owned"))
+            else:
+                control.configure(state="normal", text=self.game_state.t("buy_for", name=language_name))
+
     def _buy_language(self, language):
         if self.game_state.buy_language(language):
             self.game_state.message = self.game_state.t("bought_language", name=language.name)
         else:
             self.game_state.message = self.game_state.t("not_enough_language")
+        self._update_ui(force=True)
 
     def _buy_upgrade(self, upgrade):
         if self.game_state.buy_upgrade(upgrade):
             self.game_state.message = self.game_state.t("bought_upgrade", name=upgrade.name)
         else:
             self.game_state.message = self.game_state.t("not_enough_upgrade")
+        self._update_ui(force=True)
 
     def _buy_upgrade_for(self, upgrade, language_id):
         if self.game_state.buy_upgrade(upgrade, language_id=language_id):
@@ -431,13 +472,16 @@ class GameApp(ctk.CTk):
                 self.game_state.message = self.game_state.t("bought_upgrade", name=f"{upgrade.name} ({language.name})")
         else:
             self.game_state.message = self.game_state.t("not_enough_upgrade")
+        self._update_ui(force=True)
 
     def _claim_quest(self, quest):
         if self.game_state.claim_quest(quest):
             self.game_state.message = self.game_state.t("quest_done", name=quest.title)
+        self._update_ui(force=True)
 
     def _attack(self, opponent):
         self.game_state.message = self.game_state.attack_opponent(opponent)
+        self._update_ui(force=True)
 
     def _rebirth_ready_message(self):
         return self.game_state.t("rebirth_ready") if self.game_state.can_rebirth() else ""
@@ -451,12 +495,14 @@ class GameApp(ctk.CTk):
                 if self.game_state.enter_base():
                     self._scene_built_for = None
                     self._build_scene()
+                    self._update_ui(force=True)
             elif self.game_state.scene == "base":
                 if self.game_state.player_near_base_chest() and self.game_state.claim_base_chest():
-                    self._update_ui()
+                    self._update_ui(force=True)
                 elif self.game_state.player_near_base_exit() and self.game_state.exit_base():
                     self._scene_built_for = None
                     self._build_scene()
+                    self._update_ui(force=True)
 
     def _on_key_release(self, event):
         self._keys_down.discard(event.keysym.lower())
@@ -499,7 +545,6 @@ class GameApp(ctk.CTk):
                     self.game_state.message = self.game_state.t("base_chest")
 
             self.game_state.program_tick()
-            self.game_state.sync_quests()
 
             if self._scene_built_for != self.game_state.scene:
                 self._build_scene()

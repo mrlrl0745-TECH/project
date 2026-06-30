@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 import time
 
@@ -17,7 +18,7 @@ class Player:
     languages: list = field(default_factory=list)
     upgrades: list = field(default_factory=list)
     office_slots: int = 999
-    click_times: list[float] = field(default_factory=list)
+    click_times: deque[float] = field(default_factory=deque)
     quests_completed: int = 0
     attacks_done: int = 0
     games_won: int = 0
@@ -41,7 +42,8 @@ class Player:
 
     def click(self) -> bool:
         now = time.time()
-        self.click_times = [t for t in self.click_times if now - t < 1]
+        while self.click_times and now - self.click_times[0] >= 1:
+            self.click_times.popleft()
 
         if len(self.click_times) >= 10:
             return False

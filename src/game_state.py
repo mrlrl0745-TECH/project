@@ -109,7 +109,7 @@ class GameState:
             "rebirth_bonus": "Permanent bonus",
         },
         "ru": {
-            "title": "Симулятор Программиста",
+            "title": "Симулятор программиста",
             "start_name": "Введите ваше имя",
             "start_button": "Начать",
             "program": "Программировать",
@@ -239,6 +239,7 @@ class GameState:
             Upgrade("C++ focus", 960, income_multiplier_bonus=0.5, per_language=True),
         ]
         self.player.upgrades = self.upgrades
+        self._freelance_upgrade = next((upgrade for upgrade in self.upgrades if upgrade.name == "Freelance contract"), None)
 
         self.quests = [
             Quest("First clicks", "Earn coins by programming", 25, 50),
@@ -371,6 +372,8 @@ class GameState:
         self.online_players = self._build_online_players()
         self._base_chest_last = time.time()
         self._freelance_last_payout = time.time()
+        for quest in self.quests:
+            quest.claimed = False
         self.message = self.t("rebirth_done")
         self._refresh_quests()
         return True
@@ -384,7 +387,7 @@ class GameState:
         self.total_earned += earned
 
     def freelance_income_tick(self) -> float:
-        freelance = next((u for u in self.upgrades if u.name == "Freelance contract"), None)
+        freelance = self._freelance_upgrade
         if freelance is None or not freelance.bought:
             return 0.0
 
@@ -420,7 +423,6 @@ class GameState:
             return False
         purchased = self.player.buy_language(language)
         if purchased:
-            self.total_earned += language.cost
             self._refresh_quests()
         return purchased
 
@@ -442,7 +444,6 @@ class GameState:
             self.player.coins -= price
             upgrade.purchased_for.add(language_id)
             language.income_multiplier += upgrade.income_multiplier_bonus
-            self.total_earned += price
             self.message = self.t("bought_upgrade", name=f"{upgrade.name} ({language.name})")
             self._refresh_quests()
             return True
@@ -453,12 +454,13 @@ class GameState:
 
         self.player.coins -= price
         upgrade.bought = True
+        if upgrade.name == "Freelance contract":
+            self._freelance_last_payout = time.time()
         if upgrade.health_bonus:
             self.player.max_health += upgrade.health_bonus
             self.player.health = min(self.player.max_health, self.player.health + upgrade.health_bonus)
         if upgrade.speed_bonus:
             self.player.speed += upgrade.speed_bonus
-        self.total_earned += price
         self._refresh_quests()
         return True
 

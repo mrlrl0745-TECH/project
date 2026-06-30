@@ -44,6 +44,13 @@ def save_game(game_state) -> None:
             }
             for upgrade in player.upgrades
         ],
+        "quests": [
+            {
+                "title": quest.title,
+                "claimed": quest.claimed,
+            }
+            for quest in game_state.quests
+        ],
     }
     SAVE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     session_total = max(0.0, float(game_state.total_earned) - float(game_state.db_synced_total))
@@ -122,4 +129,23 @@ def load_game(game_state) -> None:
             upgrade.bought = False
             upgrade.purchased_for.clear()
 
+    saved_quests = {}
+    for item in data.get("quests", []):
+        if isinstance(item, dict) and "title" in item:
+            saved_quests[item["title"]] = bool(item.get("claimed", False))
+
+    for quest in game_state.quests:
+        quest.claimed = saved_quests.get(quest.title, False)
+
+    game_state.set_player_name(game_state.player_name)
+    if game_state.scene == "world":
+        game_state.message = game_state.t("enter_base") if game_state.player_near_base() else ""
+    elif game_state.player_near_base_exit():
+        game_state.message = game_state.t("leave_base")
+    elif game_state.player_near_base_chest():
+        game_state.message = game_state.t("base_chest")
+    else:
+        game_state.message = game_state.t("base_interior")
+    game_state._refresh_quests()
+    game_state.refresh_top_players()
     upsert_user(game_state, session_total=0.0)
